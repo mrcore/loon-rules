@@ -1,0 +1,40 @@
+name: Sync AI Loon rules
+
+'on':
+  schedule:
+    # 09:27 Singapore time
+    - cron: '27 1 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: sync-ai-loon-rules
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Fetch GeoSite and regenerate AI.list
+        run: python3 scripts/sync_ai.py
+
+      - name: Commit updated rules
+        run: |
+          git add -- AI.list
+          if git diff --cached --quiet -- AI.list; then
+            echo 'AI.list is up to date.'
+            exit 0
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Update AI Loon rules' -- AI.list
+          git push origin "HEAD:$GITHUB_REF"
