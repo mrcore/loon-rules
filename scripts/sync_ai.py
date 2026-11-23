@@ -10,7 +10,21 @@ from sync_claude import HOSTNAME, KEYWORD, REPOSITORY, RULE_TYPES
 
 ARCHIVE_URL = "https://codeload.github.com/v2fly/domain-list-community/tar.gz/refs/heads/master"
 ARCHIVE_ROOT = "domain-list-community-master"
-CATEGORIES = ("category-ai-!cn", "category-ai-cn", "category-ai-ru")
+CATEGORIES = ("category-ai-!cn", "category-ai-ru")
+# GeoSite's !cn category also includes overseas endpoints of Chinese services.
+EXCLUDED_CATEGORIES = ("category-ai-cn", "bytedance-ai-!cn", "manus", "youmind")
+EXCLUDED_DOMAINS = {
+    "dify.ai",
+    "kimi.ai",
+    "lovart.ai",
+    "minimax.io",
+    "moonshot.ai",
+    "notegpt.io",
+    "qoder.com",
+    "sider.ai",
+    "tapnow.ai",
+    "tripo3d.ai",
+}
 OUTPUT = Path(__file__).resolve().parents[1] / "AI.list"
 EXTRA_DOMAINS = (
     "character.ai",
@@ -59,6 +73,32 @@ def expand(archive, name, parents=()):
 
 
 def convert(archive):
+    excluded_suffixes = {"cn", *EXCLUDED_DOMAINS}
+    excluded_hosts = set()
+    excluded_keywords = set()
+    for category in EXCLUDED_CATEGORIES:
+        for kind, value, _, _ in expand(archive, category):
+            if kind == "domain":
+                excluded_suffixes.add(value.lower())
+            elif kind == "full":
+                excluded_hosts.add(value.lower())
+            elif kind == "keyword":
+                excluded_keywords.add(value.lower())
+
+    def is_excluded(kind, value):
+        if kind == "keyword":
+            return any(value in host for host in excluded_suffixes | excluded_hosts) or any(
+                value in keyword or keyword in value for keyword in excluded_keywords
+            )
+        return (
+            value in excluded_hosts
+            or any(value == suffix or value.endswith(f".{suffix}") for suffix in excluded_suffixes)
+            or any(keyword in value for keyword in excluded_keywords)
+            or (kind == "domain" and any(
+                host.endswith(f".{value}") for host in excluded_suffixes | excluded_hosts
+            ))
+        )
+
     rules = set()
     for category in CATEGORIES:
         for kind, value, attributes, location in expand(archive, category):
@@ -74,18 +114,19 @@ def convert(archive):
             pattern = KEYWORD if kind == "keyword" else HOSTNAME
             if not pattern.fullmatch(value) or len(value) > 253:
                 raise ValueError(f"{location}: invalid {kind} rule: {value}")
-            rules.add(f"{RULE_TYPES[kind]},{value}")
+            if not is_excluded(kind, value):
+                rules.add(f"{RULE_TYPES[kind]},{value}")
 
     if not rules:
         raise ValueError("GeoSite AI categories contain no supported rules")
-    rules.update(f"DOMAIN-SUFFIX,{domain}" for domain in EXTRA_DOMAINS)
+    rules.update(f"DOMAIN-SUFFIX,{domain}" for domain in EXTRA_DOMAINS if not is_excluded("domain", domain))
 
     header = [
         "#",
         "#!name=AI",
-        "#!desc=主流 AI 服务的 Loon 分流规则，包含 GeoSite AI 分类和补充域名。",
-        "#!homepage=https://github.com/mrcore/claude-loon-rules",
-        "#!raw-url=https://raw.githubusercontent.com/mrcore/claude-loon-rules/main/AI.list",
+        "#!desc=非中国 AI 服务的 Loon 分流规则，包含 GeoSite AI 分类和补充域名。",
+        "#!homepage=https://github.com/mrcore/loon-rules",
+        "#!raw-url=https://raw.githubusercontent.com/mrcore/loon-rules/main/AI.list",
         "#!tag=AI, GeoSite",
         f"#!support={len(rules)}",
         *(f"# Source: {REPOSITORY}/blob/master/data/{category}" for category in CATEGORIES),
