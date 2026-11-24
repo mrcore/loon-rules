@@ -4,7 +4,7 @@
 #!homepage=https://github.com/mrcore/loon-rules
 #!raw-url=https://raw.githubusercontent.com/mrcore/loon-rules/main/AI.list
 #!tag=AI, GeoSite
-#!support=207
+#!support=208
 # Source: https://github.com/v2fly/domain-list-community/blob/master/data/category-ai-!cn
 # Source: https://github.com/v2fly/domain-list-community/blob/master/data/category-ai-ru
 #
@@ -148,6 +148,7 @@ DOMAIN-SUFFIX,geller-pa.googleapis.com
 DOMAIN-SUFFIX,gemini.google
 DOMAIN-SUFFIX,gemini.google.com
 DOMAIN-SUFFIX,gemini.gstatic.com
+DOMAIN-SUFFIX,gemma.ai
 DOMAIN-SUFFIX,generativeai.google
 DOMAIN-SUFFIX,generativelanguage.googleapis.com
 DOMAIN-SUFFIX,gerwin.io
