@@ -11,6 +11,7 @@ from sync_claude import HOSTNAME, KEYWORD, REPOSITORY, RULE_TYPES
 ARCHIVE_URL = "https://codeload.github.com/v2fly/domain-list-community/tar.gz/refs/heads/master"
 ARCHIVE_ROOT = "domain-list-community-master"
 CATEGORIES = ("category-ai-!cn", "category-ai-ru")
+CLOUDFLARE_CATEGORY = "cloudflare"
 # GeoSite's !cn category also includes overseas endpoints of Chinese services.
 EXCLUDED_CATEGORIES = ("category-ai-cn", "bytedance-ai-!cn", "manus", "youmind")
 EXCLUDED_DOMAINS = {
@@ -100,9 +101,10 @@ def convert(archive):
         )
 
     rules = set()
-    for category in CATEGORIES:
+    for category in (*CATEGORIES, CLOUDFLARE_CATEGORY):
+        include_all = category == CLOUDFLARE_CATEGORY
         for kind, value, attributes, location in expand(archive, category):
-            if attributes & EXCLUDED_ATTRIBUTES:
+            if not include_all and attributes & EXCLUDED_ATTRIBUTES:
                 continue
             if kind == "regexp":
                 print(f"Skipped GeoSite regexp at {location}: Loon has no hostname regex rule.", file=sys.stderr)
@@ -114,7 +116,7 @@ def convert(archive):
             pattern = KEYWORD if kind == "keyword" else HOSTNAME
             if not pattern.fullmatch(value) or len(value) > 253:
                 raise ValueError(f"{location}: invalid {kind} rule: {value}")
-            if not is_excluded(kind, value):
+            if include_all or not is_excluded(kind, value):
                 rules.add(f"{RULE_TYPES[kind]},{value}")
 
     if not rules:
@@ -124,12 +126,12 @@ def convert(archive):
     header = [
         "#",
         "#!name=AI",
-        "#!desc=非中国 AI 服务的 Loon 分流规则，包含 GeoSite AI 分类和补充域名。",
+        "#!desc=非中国 AI 服务及 Cloudflare 域名的 Loon 分流规则。",
         "#!homepage=https://github.com/mrcore/loon-rules",
         "#!raw-url=https://raw.githubusercontent.com/mrcore/loon-rules/main/AI.list",
         "#!tag=AI, GeoSite",
         f"#!support={len(rules)}",
-        *(f"# Source: {REPOSITORY}/blob/master/data/{category}" for category in CATEGORIES),
+        *(f"# Source: {REPOSITORY}/blob/master/data/{category}" for category in (*CATEGORIES, CLOUDFLARE_CATEGORY)),
         "#",
         *(f"# {line}".rstrip() for line in read_text(archive, "LICENSE").splitlines()),
         "#",
@@ -138,7 +140,7 @@ def convert(archive):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Combine GeoSite AI categories into one Loon list.")
+    parser = argparse.ArgumentParser(description="Combine GeoSite AI and Cloudflare rules into one Loon list.")
     parser.add_argument("--source-archive", type=Path, help="Use a local GeoSite tar.gz snapshot.")
     parser.add_argument("--output", type=Path, default=OUTPUT, help="Path to the generated list.")
     args = parser.parse_args()
